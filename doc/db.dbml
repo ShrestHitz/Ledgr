@@ -1,0 +1,112 @@
+// Ledgr — Personal Finance Tracker
+// Generate docs: dbdocs build doc/db.dbml
+// Generate SQL:  dbml2sql --postgres -o doc/schema.sql doc/db.dbml
+
+Table users {
+  id bigserial [pk]
+  username varchar [unique, not null]
+  hashed_password varchar [not null]
+  full_name varchar [not null]
+  email varchar [unique, not null]
+  password_changed_at timestamptz [not null, default: '0001-01-01 00:00:00Z']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table accounts {
+  id bigserial [pk]
+  owner varchar [not null, ref: > users.username]
+  name varchar [not null, note: 'e.g. Cash, Savings, HDFC Credit Card']
+  balance bigint [not null, default: 0, note: 'stored in paise (smallest INR unit)']
+  currency varchar [not null, default: 'INR']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    owner
+  }
+}
+
+Table categories {
+  id bigserial [pk]
+  owner varchar [ref: > users.username, note: 'NULL = system/global category']
+  name varchar [not null]
+  type varchar [not null, note: 'income or expense']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    owner
+  }
+}
+
+Table entries {
+  id bigserial [pk]
+  account_id bigint [not null, ref: > accounts.id]
+  category_id bigint [ref: > categories.id, note: 'nullable for transfers']
+  amount bigint [not null, note: 'negative = expense, positive = income; in paise']
+  note varchar
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    account_id
+    category_id
+    created_at
+  }
+}
+
+Table transfers {
+  id bigserial [pk]
+  from_account_id bigint [not null, ref: > accounts.id]
+  to_account_id bigint [not null, ref: > accounts.id]
+  amount bigint [not null, note: 'must be positive; in paise']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    from_account_id
+    to_account_id
+  }
+}
+
+Table budgets {
+  id bigserial [pk]
+  owner varchar [not null, ref: > users.username]
+  category_id bigint [not null, ref: > categories.id]
+  monthly_limit bigint [not null, note: 'in paise']
+  month int [not null, note: '1-12']
+  year int [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    owner
+    (category_id, month, year)
+  }
+}
+
+Table savings_goals {
+  id bigserial [pk]
+  owner varchar [not null, ref: > users.username]
+  title varchar [not null]
+  target_amount bigint [not null, note: 'in paise']
+  current_amount bigint [not null, default: 0, note: 'in paise']
+  target_date date
+  linked_account_id bigint [not null, ref: > accounts.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    owner
+  }
+}
+
+Table recurring_payments {
+  id bigserial [pk]
+  owner varchar [not null, ref: > users.username]
+  title varchar [not null]
+  amount bigint [not null, note: 'in paise']
+  category_id bigint [not null, ref: > categories.id]
+  frequency varchar [not null, note: 'daily / weekly / monthly / yearly']
+  next_due_date date [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    owner
+    next_due_date
+  }
+}
